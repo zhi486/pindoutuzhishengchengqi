@@ -42,11 +42,13 @@ class BeadPalette:
                        默认使用 data/perler_colors.json
         """
         if json_path is None:
-            json_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                "data",
-                "perler_colors.json",
-            )
+            # PyInstaller 打包后资源在 sys._MEIPASS
+            import sys
+            if getattr(sys, 'frozen', False):
+                base = sys._MEIPASS
+            else:
+                base = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            json_path = os.path.join(base, "data", "perler_colors.json")
 
         data = self._load_json(json_path)
         self.brand = data["brand"]
