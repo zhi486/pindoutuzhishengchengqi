@@ -84,6 +84,7 @@ class MainWindow(ctk.CTk):
             on_zoom_changed=self._on_zoom_changed,
             on_export_png=self._on_export_png,
             on_export_pdf=self._on_export_pdf,
+            on_palette_mode_changed=self._on_palette_mode_changed,
         )
         self.control_panel.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
@@ -106,10 +107,25 @@ class MainWindow(ctk.CTk):
         except Exception as e:
             self.status_bar.show(f"加载失败: {e}")
 
+    # 仅影响显示、不需要重新计算管道的参数
+    _DISPLAY_ONLY_PARAMS = {"show_grid", "show_board_lines", "show_color_codes"}
+
     def _on_param_changed(self, key: str, value):
-        """参数变更回调。"""
+        """参数变更回调。显示类参数仅重渲染，不重新计算。"""
         self.controller.set_param(key, value)
-        self._regenerate()
+        if key in self._DISPLAY_ONLY_PARAMS:
+            self._rerender()
+        else:
+            self._regenerate()
+
+    def _on_palette_mode_changed(self, mode: str):
+        """色卡模式切换回调。"""
+        try:
+            self.controller.palette_mode = mode
+            self.status_bar.show(f"已切换到 {mode} 色卡 ({self.controller.palette.n_colors} 色)")
+            self._regenerate()
+        except Exception as e:
+            self.status_bar.show(f"切换色卡失败: {e}")
 
     def _on_zoom_changed(self, tile_size: int):
         """缩放变更回调 —— 仅重渲染预览，不重新计算管道。"""
@@ -119,6 +135,7 @@ class MainWindow(ctk.CTk):
         self.preview_canvas.show_pattern(
             self.controller.current_pattern,
             self.controller.get_params(),
+            palette=self.controller.palette,
             tile_size=tile_size,
         )
 
@@ -130,7 +147,11 @@ class MainWindow(ctk.CTk):
         try:
             pattern = self.controller.process()
             params = self.controller.get_params()
-            self.preview_canvas.show_pattern(pattern, params, tile_size=self._tile_size)
+            self.preview_canvas.show_pattern(
+                pattern, params,
+                palette=self.controller.palette,
+                tile_size=self._tile_size,
+            )
             self.color_legend.show_legend(pattern.color_summary)
             self.status_bar.show(self._build_status_text(pattern))
             # 显示自动计算的宽度
@@ -140,10 +161,24 @@ class MainWindow(ctk.CTk):
             import traceback
             traceback.print_exc()
 
+    def _rerender(self):
+        """仅刷新预览渲染，不重新计算管道（用于显示选项变更）。"""
+        if not self.controller.current_pattern:
+            return
+        pattern = self.controller.current_pattern
+        params = self.controller.get_params()
+        self.preview_canvas.show_pattern(
+            pattern, params,
+            palette=self.controller.palette,
+            tile_size=self._tile_size,
+        )
+        # 图例数据未变，不需要刷新
+
     def _build_status_text(self, pattern) -> str:
         """构建状态栏文本。"""
         w, h = pattern.bead_size
         parts = [f"{w} × {h} 豆子"]
+        parts.append(f"{self.controller.palette_mode}色卡")
         parts.append(f"{pattern.unique_colors} 种颜色")
         parts.append(f"共 {pattern.total_beads} 颗")
         if pattern.board_layout:

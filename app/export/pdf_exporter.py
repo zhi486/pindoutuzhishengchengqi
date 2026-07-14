@@ -13,6 +13,24 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm, cm
 from reportlab.lib import colors as rl_colors
 from reportlab.pdfgen import canvas as rl_canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+# ── 注册中文字体 ──────────────────────────────────
+_CN_FONT_NAME = "Helvetica"  # fallback
+_CN_FONT_BOLD = "Helvetica-Bold"
+for _font_path, _font_name, _bold_name in [
+    ("C:/Windows/Fonts/simhei.ttf", "SimHei", "SimHei"),
+    ("C:/Windows/Fonts/msyh.ttc", "MSYH", "MSYH"),
+    ("C:/Windows/Fonts/simsun.ttc", "SimSun", "SimSun"),
+]:
+    try:
+        pdfmetrics.registerFont(TTFont(_font_name, _font_path))
+        _CN_FONT_NAME = _font_name
+        _CN_FONT_BOLD = _bold_name
+        break
+    except Exception:
+        continue
 
 
 # A4 尺寸
@@ -92,6 +110,7 @@ def export_pdf(
                 total_boards=board_rows * board_cols,
                 bead_w=board_bead_w,
                 bead_h=board_bead_h,
+                show_color_codes=params.get("show_color_codes", False),
             )
 
             c.showPage()
@@ -104,9 +123,10 @@ def export_pdf(
 
 
 def _draw_board_page(c, grid, indices, palette, cell_pt, margin_x, start_y,
-                     board_num, total_boards, bead_w, bead_h):
+                     board_num, total_boards, bead_w, bead_h,
+                     show_color_codes=False):
     """绘制单块底板的图案，含行列号标注。"""
-    c.setFont("Helvetica", 8)
+    c.setFont(_CN_FONT_NAME, 8)
 
     # 计算标注边距
     label_margin = 14
@@ -150,10 +170,37 @@ def _draw_board_page(c, grid, indices, palette, cell_pt, margin_x, start_y,
         fill=0, stroke=1,
     )
 
+    # 色号标注
+    if show_color_codes and cell_pt >= 8:
+        font_size = max(4, cell_pt * 0.42)
+        c.setFont(_CN_FONT_NAME, font_size)
+
+        for r in range(bead_h):
+            for col in range(bead_w):
+                color_idx = int(indices[r, col])
+                code = palette.codes[color_idx]
+                hex_color = palette.get_hex_color(color_idx)
+
+                # 计算背景亮度，选黑/白文字
+                r_val = int(hex_color[1:3], 16)
+                g_val = int(hex_color[3:5], 16)
+                b_val = int(hex_color[5:7], 16)
+                luminance = 0.299 * r_val + 0.587 * g_val + 0.114 * b_val
+
+                if luminance > 128:
+                    c.setFillColor(rl_colors.Color(0.15, 0.15, 0.15))
+                else:
+                    c.setFillColor(rl_colors.Color(0.9, 0.9, 0.9))
+
+                # 居中文字
+                x = grid_start_x + col * cell_pt + cell_pt * 0.15
+                y = grid_start_y + (bead_h - 1 - r) * cell_pt + cell_pt * 0.3
+                c.drawString(x, y, code)
+
     # 行号（左侧）/ 列号（上方），每5格标注
     interval = 1 if max(bead_w, bead_h) <= 30 else 5
     c.setFillColor(rl_colors.Color(0.35, 0.35, 0.35))
-    c.setFont("Helvetica", 5)
+    c.setFont(_CN_FONT_NAME, 5)
 
     for r in range(0, bead_h, interval):
         y = grid_start_y + (bead_h - 1 - r) * cell_pt + cell_pt / 2 + 1
@@ -169,17 +216,17 @@ def _draw_legend_page(c, pattern, palette):
     margin = MARGIN
     y = PAGE_H - MARGIN
 
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont(_CN_FONT_BOLD, 14)
     c.setFillColor(rl_colors.black)
     c.drawString(margin, y, "颜色图例与购物清单")
     y -= 25
 
-    c.setFont("Helvetica", 10)
+    c.setFont(_CN_FONT_NAME, 10)
     c.drawString(margin, y, f"总豆子数: {pattern.total_beads}    "
                  f"颜色数: {pattern.unique_colors}")
     y -= 20
 
-    c.setFont("Helvetica", 9)
+    c.setFont(_CN_FONT_NAME, 9)
     for color_info in pattern.color_summary:
         if y < 40:  # 换页
             c.showPage()

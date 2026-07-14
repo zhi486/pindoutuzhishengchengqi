@@ -13,7 +13,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from app.core.pixelizer import (upsample_for_preview, draw_grid_lines,
-                                draw_board_lines, add_coordinate_labels)
+                                draw_board_lines, add_coordinate_labels,
+                                draw_color_codes)
 
 
 # 图例区域的像素宽度
@@ -102,25 +103,7 @@ def export_png(
     font = _get_font(18)
     small_font = _get_font(13)
 
-    grid_w = pattern.bead_size[0] * tile_size
-    grid_h = pattern.bead_size[1] * tile_size
-
-    # Canvas 尺寸: 网格 + 间距 + 图例
-    canvas_w = grid_w + LEGEND_PADDING + LEGEND_WIDTH + 40
-    canvas_h = max(grid_h, 800) + TITLE_HEIGHT + 20
-
-    # 创建画布
-    canvas = Image.new("RGB", (canvas_w, canvas_h), (255, 255, 255))
-    draw = ImageDraw.Draw(canvas)
-
-    # 标题
-    draw.text(
-        (20, 15),
-        f"拼豆图纸  {pattern.bead_size[0]}×{pattern.bead_size[1]}   "
-        f"像素大小:{pattern.pixel_size}  颜色:{pattern.unique_colors}种",
-        fill=(0, 0, 0),
-        font=font,
-    )
+    # ── 先渲染 grid_img（含所有变换），再根据最终尺寸建画布 ──
 
     # 渲染像素网格
     grid_img = upsample_for_preview(pattern.grid, tile_size)
@@ -135,23 +118,46 @@ def export_png(
         bh = params.get("board_height", 29)
         grid_img = draw_board_lines(grid_img, tile_size, bw, bh, (50, 50, 50))
 
-    # 行列号标注
+    # 色号标注（在坐标标注之前）
+    if params.get("show_color_codes", False):
+        grid_img = draw_color_codes(grid_img, pattern.indices, palette, tile_size)
+
+    # 行列号标注（会扩展画布添加边距）
     bead_w, bead_h = pattern.bead_size
     grid_img = add_coordinate_labels(grid_img, tile_size, bead_w, bead_h)
 
+    # 用最终图片尺寸计算画布
+    grid_img_w, grid_img_h = grid_img.size
+    canvas_w = grid_img_w + LEGEND_PADDING + LEGEND_WIDTH + 40
+    canvas_h = max(grid_img_h, 800) + TITLE_HEIGHT + 40
+
+    # 创建画布
+    canvas = Image.new("RGB", (canvas_w, canvas_h), (255, 255, 255))
+    draw = ImageDraw.Draw(canvas)
+
+    # 标题
+    draw.text(
+        (20, 15),
+        f"拼豆图纸  {pattern.bead_size[0]}×{pattern.bead_size[1]}   "
+        f"像素大小:{pattern.pixel_size}  颜色:{pattern.unique_colors}种",
+        fill=(0, 0, 0),
+        font=font,
+    )
+
     # 贴到画布上
+    grid_x = 20
     grid_y = TITLE_HEIGHT
-    canvas.paste(grid_img, (20, grid_y))
+    canvas.paste(grid_img, (grid_x, grid_y))
 
     # 图例
-    legend_x = 20 + grid_w + LEGEND_PADDING
+    legend_x = grid_x + grid_img_w + LEGEND_PADDING
     _draw_legend(draw, pattern.color_summary, legend_x, grid_y, font, small_font)
 
     # 底板信息
     if pattern.board_layout:
         bl = pattern.board_layout
         draw.text(
-            (20, grid_y + grid_h + 10),
+            (20, grid_y + grid_img_h + 10),
             f"底板: {bl.total} 块 ({bl.cols}×{bl.rows})  "
             f"每块 {bl.board_w}×{bl.board_h}",
             fill=(100, 100, 100),

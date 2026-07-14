@@ -242,6 +242,82 @@ def draw_board_lines(
     return board_img
 
 
+def draw_color_codes(
+    img: Image.Image,
+    indices: "np.ndarray",
+    palette: "BeadPalette",
+    tile_size: int,
+) -> Image.Image:
+    """在每个像素格中央绘制 MARD 色号文字。
+
+    文字颜色根据背景色亮度自适应选择黑白，保证可读性。
+    色号通常为 3 字符（如 A01、C03），在足够大的 tile 下清晰可辨。
+
+    Args:
+        img: 已上采样的预览图（尚未添加坐标标注）
+        indices: (H, W) 色卡索引数组
+        palette: BeadPalette 色卡对象
+        tile_size: 每个 tile 的像素大小
+
+    Returns:
+        带色号文字的新 PIL Image
+    """
+    if tile_size < 10:
+        return img  # 太小无法容纳文字
+
+    from PIL import ImageDraw, ImageFont
+
+    h, w = img.size
+    grid_h = indices.shape[0]
+    grid_w = indices.shape[1]
+
+    # 字体大小与 tile 成正比
+    font_size = max(7, int(tile_size * 0.45))
+    font = None
+    for fp in [
+        "C:/Windows/Fonts/consola.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/msyh.ttc",
+    ]:
+        try:
+            font = ImageFont.truetype(fp, size=font_size)
+            break
+        except (OSError, IOError):
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    result = img.copy()
+    draw = ImageDraw.Draw(result)
+    pixels = img.load()
+
+    for row in range(grid_h):
+        for col in range(grid_w):
+            color_idx = int(indices[row, col])
+            code = palette.codes[color_idx]
+
+            # 获取背景色并计算感知亮度
+            cx = col * tile_size + tile_size // 2
+            cy = row * tile_size + tile_size // 2
+            r, g, b = pixels[cx, cy]
+
+            luminance = 0.299 * r + 0.587 * g + 0.114 * b
+            text_color = (0, 0, 0) if luminance > 128 else (255, 255, 255)
+
+            # 居中绘制文字
+            if hasattr(font, "getbbox"):
+                bbox = font.getbbox(code)
+                tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            else:
+                tw, th = len(code) * font_size * 0.6, font_size
+
+            tx = col * tile_size + (tile_size - tw) // 2
+            ty = row * tile_size + (tile_size - th) // 2
+            draw.text((tx, ty), code, fill=text_color, font=font)
+
+    return result
+
+
 def add_coordinate_labels(
     img: Image.Image,
     tile_size: int,

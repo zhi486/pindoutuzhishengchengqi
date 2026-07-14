@@ -10,7 +10,8 @@ from typing import Optional
 import numpy as np
 
 from app.core.pixelizer import (upsample_for_preview, draw_grid_lines,
-                                draw_board_lines, add_coordinate_labels)
+                                draw_board_lines, add_coordinate_labels,
+                                draw_color_codes)
 
 
 class PreviewCanvas(ctk.CTkFrame):
@@ -26,7 +27,7 @@ class PreviewCanvas(ctk.CTkFrame):
         self.canvas_image_id = None
 
         # Canvas
-        self.canvas = ctk.CTkCanvas(self, bg="#F0F0F0", highlightthickness=0)
+        self.canvas = ctk.CTkCanvas(self, bg="#FFFFFF", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
 
         # 滚动条
@@ -56,13 +57,15 @@ class PreviewCanvas(ctk.CTkFrame):
         self,
         pattern,
         params: dict,
+        palette=None,
         tile_size: int = None,
     ):
         """渲染并显示图案预览。
 
         Args:
             pattern: Pattern 对象
-            params: 参数字典 (show_grid, show_board_lines, board_width, board_height)
+            params: 参数字典 (show_grid, show_board_lines, show_color_codes, board_width, board_height)
+            palette: BeadPalette 色卡对象 (色号标注时需要)
             tile_size: 每个豆子的显示像素大小
         """
         if tile_size is None:
@@ -76,6 +79,7 @@ class PreviewCanvas(ctk.CTkFrame):
 
         show_grid = params.get("show_grid", True)
         show_boards = params.get("show_board_lines", True)
+        show_codes = params.get("show_color_codes", False)
 
         # 网格线（含每5格强调线）
         if show_grid:
@@ -86,6 +90,10 @@ class PreviewCanvas(ctk.CTkFrame):
             bw = params.get("board_width", 29)
             bh = params.get("board_height", 29)
             preview = draw_board_lines(preview, tile_size, bw, bh, self.BOARD_COLOR)
+
+        # 色号标注（在坐标标注之前，因为坐标标注会加边距）
+        if show_codes and palette is not None:
+            preview = draw_color_codes(preview, pattern.indices, palette, tile_size)
 
         # 行列号标注
         bead_w, bead_h = pattern.bead_size

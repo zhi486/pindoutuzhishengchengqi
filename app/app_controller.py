@@ -4,8 +4,10 @@
 1. 管理原始图片和参数状态
 2. 串联 pixelizer → color_quantizer → color_matcher → pattern
 3. 向 UI 层提供数据
+4. 管理 291/221 色卡切换
 """
 
+import os
 from typing import Optional
 
 import numpy as np
@@ -18,18 +20,38 @@ from app.core.bead_palette import BeadPalette
 from app.core.pattern import Pattern
 
 
+def _get_data_dir():
+    """获取 data 目录路径（兼容 PyInstaller 打包）。"""
+    import sys
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, "data")
+    return os.path.join(os.path.dirname(__file__), "..", "data")
+
+
 class AppController:
     """应用主控制器。
 
     Attributes:
-        palette: 色卡对象
         original_image: 原始 PIL Image
         current_pattern: 当前处理结果 (Pattern)
+        palette_mode: "291" 或 "221"
         params: 当前参数字典
     """
 
     def __init__(self):
-        self.palette = BeadPalette()
+        data_dir = _get_data_dir()
+
+        # 加载两套色卡
+        self._palette_291 = BeadPalette(os.path.join(data_dir, "perler_colors.json"))
+        self._palette_221_path = os.path.join(data_dir, "perler_colors_221.json")
+        self._palette_221 = None
+        if os.path.exists(self._palette_221_path):
+            try:
+                self._palette_221 = BeadPalette(self._palette_221_path)
+            except Exception:
+                self._palette_221 = None
+
+        self._palette_mode = "291"
         self.original_image: Optional[Image.Image] = None
         self.current_pattern: Optional[Pattern] = None
 
@@ -39,9 +61,35 @@ class AppController:
             "max_colors": 50,
             "show_grid": True,
             "show_board_lines": True,
+            "show_color_codes": True,  # 默认开启色号
             "board_width": 52,
             "board_height": 52,
         }
+
+    # ── 色卡管理 ──────────────────────────────────
+
+    @property
+    def palette(self) -> BeadPalette:
+        """当前激活的色卡。"""
+        if self._palette_mode == "221" and self._palette_221 is not None:
+            return self._palette_221
+        return self._palette_291
+
+    @property
+    def palette_mode(self) -> str:
+        return self._palette_mode
+
+    @palette_mode.setter
+    def palette_mode(self, mode: str):
+        if mode not in ("291", "221"):
+            raise ValueError(f"无效的色卡模式: {mode}")
+        if mode == "221" and self._palette_221 is None:
+            raise FileNotFoundError(f"221色数据文件不存在: {self._palette_221_path}")
+        self._palette_mode = mode
+
+    def has_221_palette(self) -> bool:
+        """221 色卡是否可用。"""
+        return self._palette_221 is not None
 
     # ── 图片管理 ──────────────────────────────────
 
@@ -49,7 +97,6 @@ class AppController:
         """加载图片并初始化默认豆子尺寸。"""
         self.original_image = load_image(filepath)
         w, h = self.original_image.size
-        # 默认高度取 52（一块底板），宽度按比例
         self.params["max_beads_h"] = 52
         return self.original_image
 
@@ -80,18 +127,7 @@ class AppController:
     # ── 核心处理管道 ──────────────────────────────
 
     def process(self) -> Pattern:
-        """执行完整的图像处理流程。
-
-        流程:
-        1. 计算像素大小
-        2. 降采样得到颜色网格
-        3. 颜色量化（可选）
-        4. 色卡匹配
-        5. 统计与底板计算
-
-        Returns:
-            Pattern 对象
-        """
+        """执行完整的图像处理流程。"""
         if self.original_image is None:
             raise ValueError("未加载图片")
 
@@ -100,16 +136,16 @@ class AppController:
         target_h = self.params["max_beads_h"]
         target_w = self._max_beads_w
 
-        # Step 1: 直接缩放到目标豆子尺寸（高精度，无误差）
+        # Step 1: 直接缩放到目标豆子尺寸
         raw_grid = resize_to_beads(img, target_w, target_h)
 
-        # Step 3: 颜色量化 (如果颜色太多)
+        # Step 2: 颜色量化
         quantized = quantize_grid(raw_grid, self.params["max_colors"])
 
-        # Step 4: 色卡匹配
+        # Step 3: 色卡匹配（使用当前激活的 palette）
         matched_grid, indices = match_colors(quantized, self.palette)
 
-        # Step 5: 构建 Pattern
+        # Step 4: 构建 Pattern
         pattern = Pattern(
             grid=matched_grid,
             indices=indices,
@@ -119,10 +155,7 @@ class AppController:
             original_size=(w, h),
         )
 
-        # 统计
         pattern.compute_stats(self.palette)
-
-        # 底板
         pattern.compute_board_layout(
             self.params["board_width"],
             self.params["board_height"],

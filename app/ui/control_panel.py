@@ -14,11 +14,36 @@ class ControlPanel(ctk.CTkScrollableFrame):
         on_zoom_changed: Callable[[int], None],
         on_export_png: Callable[[], None],
         on_export_pdf: Callable[[], None],
+        on_palette_mode_changed: Callable[[str], None] = None,
     ):
         super().__init__(master, label_text="参数设置", width=250)
         self.on_param_changed = on_param_changed
         self.on_zoom_changed = on_zoom_changed
+        self.on_palette_mode_changed = on_palette_mode_changed
         self._tile_size = 20
+
+        # ── 色卡模式切换 ──
+        ctk.CTkLabel(self, text="色卡模式", anchor="w").pack(
+            fill="x", padx=10, pady=(10, 0)
+        )
+
+        mode_frame = ctk.CTkFrame(self, fg_color="transparent")
+        mode_frame.pack(fill="x", padx=10, pady=(2, 0))
+
+        self.palette_mode_var = ctk.StringVar(value="291")
+        self.btn_291 = ctk.CTkButton(
+            mode_frame, text="291 色", width=90, height=30,
+            command=lambda: self._on_palette_mode("291"),
+            fg_color="#3B82F6", hover_color="#2563EB",
+        )
+        self.btn_291.pack(side="left", padx=(0, 5))
+
+        self.btn_221 = ctk.CTkButton(
+            mode_frame, text="221 色", width=90, height=30,
+            command=lambda: self._on_palette_mode("221"),
+            fg_color="#6B7280", hover_color="#4B5563",
+        )
+        self.btn_221.pack(side="left")
 
         # ── 豆子长度（行数）──
         ctk.CTkLabel(self, text="豆子长度（行数）", anchor="w").pack(
@@ -91,6 +116,14 @@ class ControlPanel(ctk.CTkScrollableFrame):
         )
         self.boards_cb.pack(fill="x", padx=15, pady=(2, 0))
 
+        self.show_codes_var = ctk.BooleanVar(value=True)
+        self.codes_cb = ctk.CTkCheckBox(
+            self, text="显示色号",
+            variable=self.show_codes_var,
+            command=lambda: self._emit("show_color_codes", self.show_codes_var.get()),
+        )
+        self.codes_cb.pack(fill="x", padx=15, pady=(2, 0))
+
         # ── 底板尺寸 ──
         ctk.CTkLabel(self, text="底板尺寸", anchor="w").pack(
             fill="x", padx=10, pady=(15, 0)
@@ -161,6 +194,20 @@ class ControlPanel(ctk.CTkScrollableFrame):
         )
         self.export_pdf_btn.pack(pady=(5, 10))
 
+    # ── 色卡模式 ──────────────────────────────────
+
+    def _on_palette_mode(self, mode: str):
+        """切换色卡模式，更新按钮高亮状态。"""
+        self.palette_mode_var.set(mode)
+        if mode == "291":
+            self.btn_291.configure(fg_color="#3B82F6", hover_color="#2563EB")
+            self.btn_221.configure(fg_color="#6B7280", hover_color="#4B5563")
+        else:
+            self.btn_221.configure(fg_color="#3B82F6", hover_color="#2563EB")
+            self.btn_291.configure(fg_color="#6B7280", hover_color="#4B5563")
+        if self.on_palette_mode_changed:
+            self.on_palette_mode_changed(mode)
+
     # ── 豆子长度 ──────────────────────────────────
 
     def set_bead_w_display(self, w: int):
@@ -217,6 +264,7 @@ class ControlPanel(ctk.CTkScrollableFrame):
             "max_colors": int(self.max_colors_var.get()),
             "show_grid": bool(self.show_grid_var.get()),
             "show_board_lines": bool(self.show_boards_var.get()),
+            "show_color_codes": bool(self.show_codes_var.get()),
             "board_width": size,
             "board_height": size,
         }
