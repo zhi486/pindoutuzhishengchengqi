@@ -18,8 +18,8 @@ class PreviewCanvas(ctk.CTkFrame):
     """像素预览画布。"""
 
     DEFAULT_TILE_SIZE = 20
-    GRID_COLOR = (210, 210, 210)
-    BOARD_COLOR = (80, 140, 210)
+    GRID_COLOR = (215, 207, 191)   # 暖灰 #d7cfbf
+    BOARD_COLOR = (224, 90, 43)    # 陶土橙 #e05a2b
 
     def __init__(self, master):
         super().__init__(master)
@@ -27,7 +27,7 @@ class PreviewCanvas(ctk.CTkFrame):
         self.canvas_image_id = None
 
         # Canvas
-        self.canvas = ctk.CTkCanvas(self, bg="#FFFFFF", highlightthickness=0)
+        self.canvas = ctk.CTkCanvas(self, bg="#fffdf8", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
 
         # 滚动条
@@ -49,7 +49,7 @@ class PreviewCanvas(ctk.CTkFrame):
         self.canvas.create_text(
             200, 200,
             text="请先加载图片",
-            fill="gray60",
+            fill="#8a8378",
             font=("Microsoft YaHei", 14),
         )
 

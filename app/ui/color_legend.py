@@ -8,7 +8,7 @@ class ColorLegendPanel(ctk.CTkScrollableFrame):
     """颜色图例 —— 按数量降序列出所有使用到的颜色。"""
 
     def __init__(self, master):
-        super().__init__(master, label_text="颜色图例")
+        super().__init__(master, label_text="颜色图例", fg_color="#fffdf8")
         self.legend_items = []
 
     def show_legend(self, colors: list[dict]):
@@ -24,7 +24,7 @@ class ColorLegendPanel(ctk.CTkScrollableFrame):
         self.legend_items.clear()
 
         if not colors:
-            no_data = ctk.CTkLabel(self, text="暂无数据", text_color="gray50")
+            no_data = ctk.CTkLabel(self, text="暂无数据", text_color="#8a8378")
             no_data.pack(pady=5)
             self.legend_items.append(no_data)
             return
@@ -58,7 +58,7 @@ class ColorLegendPanel(ctk.CTkScrollableFrame):
                 row,
                 text=f"{color['count']} 颗",
                 font=ctk.CTkFont(size=11),
-                text_color="gray50",
+                text_color="#8a8378",
                 width=55,
                 anchor="e",
             )
@@ -73,7 +73,7 @@ class ColorLegendPanel(ctk.CTkScrollableFrame):
             total_row,
             text=f"共 {len(colors)} 种颜色，总计 {total} 颗",
             font=ctk.CTkFont(size=11, weight="bold"),
-            text_color="gray40",
+            text_color="#6f685d",
         )
         total_label.pack(side="left", padx=5)
         self.legend_items.append(total_row)

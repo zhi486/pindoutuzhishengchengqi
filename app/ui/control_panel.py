@@ -16,7 +16,7 @@ class ControlPanel(ctk.CTkScrollableFrame):
         on_export_pdf: Callable[[], None],
         on_material_changed: Callable[[str], None] = None,
     ):
-        super().__init__(master, label_text="参数设置", width=250)
+        super().__init__(master, label_text="参数设置", width=250, fg_color="#fffdf8")
         self.on_param_changed = on_param_changed
         self.on_zoom_changed = on_zoom_changed
         self.on_material_changed = on_material_changed
@@ -156,7 +156,7 @@ class ControlPanel(ctk.CTkScrollableFrame):
         self.zoom_out_btn = ctk.CTkButton(
             zoom_frame, text="−", width=36, height=30,
             command=self._zoom_out,
-            fg_color="#6B7280", hover_color="#4B5563",
+            fg_color="#8a8378", hover_color="#6f685d",
         )
         self.zoom_out_btn.pack(side="left", padx=(0, 5))
 
@@ -169,15 +169,16 @@ class ControlPanel(ctk.CTkScrollableFrame):
         self.zoom_in_btn = ctk.CTkButton(
             zoom_frame, text="+", width=36, height=30,
             command=self._zoom_in,
-            fg_color="#6B7280", hover_color="#4B5563",
+            fg_color="#8a8378", hover_color="#6f685d",
         )
         self.zoom_in_btn.pack(side="left", padx=(5, 0))
 
         self.zoom_reset_btn = ctk.CTkButton(
             zoom_frame, text="↺", width=30, height=30,
             command=self._zoom_reset,
-            fg_color="transparent", text_color="#6B7280",
-            hover_color="#E5E7EB", border_width=1,
+            fg_color="transparent", text_color="#8a8378",
+            hover_color="#fbe9df", border_width=1,
+            border_color="#d6cfbf",
         )
         self.zoom_reset_btn.pack(side="right")
 
@@ -190,7 +191,7 @@ class ControlPanel(ctk.CTkScrollableFrame):
             self, text="导出 PNG",
             command=on_export_png,
             width=200, height=36,
-            fg_color="#3B82F6", hover_color="#2563EB",
+            fg_color="#e05a2b", hover_color="#c94e24",
         )
         self.export_png_btn.pack(pady=(5, 0))
 
@@ -198,7 +199,7 @@ class ControlPanel(ctk.CTkScrollableFrame):
             self, text="导出 PDF",
             command=on_export_pdf,
             width=200, height=36,
-            fg_color="#EF4444", hover_color="#DC2626",
+            fg_color="#2c2721", hover_color="#1e1a15",
         )
         self.export_pdf_btn.pack(pady=(5, 10))
 

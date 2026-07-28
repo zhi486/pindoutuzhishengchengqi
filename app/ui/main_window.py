@@ -33,9 +33,12 @@ class MainWindow(ctk.CTk):
         self.geometry(f"{self.DEFAULT_WIDTH}x{self.DEFAULT_HEIGHT}")
         self.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
 
-        # 主题
+        # 主题 — 暖纸底对齐网页版
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("blue")
+
+        # 窗口级背景色
+        self.configure(fg_color="#f3f0ea")
 
         # 控制器 + 缩放状态
         self.controller = AppController()
@@ -59,7 +62,7 @@ class MainWindow(ctk.CTk):
         self.grid_rowconfigure(1, weight=0)  # 状态栏
 
         # --- 左侧面板 ---
-        self.left_frame = ctk.CTkFrame(self)
+        self.left_frame = ctk.CTkFrame(self, fg_color="#fffdf8")
         self.left_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         self.left_frame.grid_columnconfigure(0, weight=1)
         self.left_frame.grid_rowconfigure(0, weight=0)  # 上传区

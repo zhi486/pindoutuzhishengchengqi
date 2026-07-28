@@ -18,7 +18,7 @@ class ImageDropZone(ctk.CTkFrame):
         on_image_loaded: Callable[[str], None],
         height: int = 150,
     ):
-        super().__init__(master, height=height)
+        super().__init__(master, height=height, fg_color="#fffdf8")
         self.on_image_loaded = on_image_loaded
         self.current_filepath: Optional[str] = None
 
@@ -30,7 +30,7 @@ class ImageDropZone(ctk.CTkFrame):
             self,
             text="拖放图片到此处\n或点击下方按钮选择",
             font=ctk.CTkFont(size=13),
-            text_color="gray60",
+            text_color="#8a8378",
         )
         self.label.place(relx=0.5, rely=0.35, anchor="center")
 
@@ -49,7 +49,7 @@ class ImageDropZone(ctk.CTkFrame):
             self,
             text="",
             font=ctk.CTkFont(size=11),
-            text_color="gray50",
+            text_color="#6f685d",
         )
         self.info_label.place(relx=0.5, rely=0.85, anchor="center")
 
