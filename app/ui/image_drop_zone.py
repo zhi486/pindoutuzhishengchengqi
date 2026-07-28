@@ -6,70 +6,60 @@ from PIL import Image
 from typing import Callable, Optional
 
 
-ACCENT       = "#e05a2b"
-ACCENT_SOFT  = "#fbe9df"
-CARD         = "#fffdf8"
-SUB          = "#8a8378"
+ACCENT        = "#e05a2b"
+ACCENT_SOFT   = "#fbe9df"
+CARD          = "#fffdf8"
+SUB           = "#8a8378"
 BORDER_STRONG = "#d6cfbf"
 
 
 class ImageDropZone(ctk.CTkFrame):
-    """图片加载区域 —— 虚线边框 + 居中图标。"""
+    """图片加载区域 —— 虚线边框 + 居中内容。"""
 
     def __init__(
         self,
         master,
         on_image_loaded: Callable[[str], None],
-        height: int = 140,
+        height: int = 150,
     ):
         super().__init__(master, height=height, fg_color=CARD,
                          corner_radius=12, border_width=2, border_color=BORDER_STRONG)
         self.on_image_loaded = on_image_loaded
         self.current_filepath: Optional[str] = None
-
         self.grid_propagate(False)
 
-        # 图标区（accent 柔和底色方块）
-        icon_frame = ctk.CTkFrame(self, fg_color=ACCENT_SOFT,
-                                   width=50, height=50, corner_radius=12)
-        icon_frame.place(relx=0.5, rely=0.28, anchor="center")
+        # 用 pack 垂直居中所有内容
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.place(relx=0.5, rely=0.5, anchor="center")
+
+        # 图标方块（accent 柔和底色）
+        icon_frame = ctk.CTkFrame(inner, fg_color=ACCENT_SOFT,
+                                   width=46, height=46, corner_radius=12)
+        icon_frame.pack(pady=(0, 8))
         icon_frame.pack_propagate(False)
         ctk.CTkLabel(icon_frame, text="🖼️", font=ctk.CTkFont(size=20)).pack(expand=True)
 
-        # 提示文字
+        # 主提示
         self.label = ctk.CTkLabel(
-            self,
+            inner,
             text="点击选择图片",
             font=ctk.CTkFont(family="Microsoft YaHei", size=14, weight="bold"),
             text_color="#4a443c",
         )
-        self.label.place(relx=0.5, rely=0.52, anchor="center")
+        self.label.pack()
 
         # 副提示
         hint = ctk.CTkLabel(
-            self,
+            inner,
             text="拍照或从相册选取 · 图片仅在本地处理",
             font=ctk.CTkFont(family="Microsoft YaHei", size=11),
             text_color=SUB,
         )
-        hint.place(relx=0.5, rely=0.70, anchor="center")
+        hint.pack(pady=(2, 0))
 
-        # 选择按钮
-        self.browse_btn = ctk.CTkButton(
-            self,
-            text="选择图片",
-            command=self._browse_file,
-            width=120, height=32,
-            fg_color=ACCENT, hover_color="#c94e24",
-            corner_radius=10,
-            font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
-        )
-        self.browse_btn.place(relx=0.5, rely=0.88, anchor="center")
-
-        # 绑定点击整块区域
-        self.label.bind("<Button-1>", lambda e: self._browse_file())
-        hint.bind("<Button-1>", lambda e: self._browse_file())
-        self.bind("<Button-1>", lambda e: self._browse_file())
+        # 整个区域可点击
+        for w in (self, inner, icon_frame, self.label, hint):
+            w.bind("<Button-1>", lambda e: self._browse_file())
 
     def _browse_file(self):
         filepath = ctk.filedialog.askopenfilename(
