@@ -11,7 +11,7 @@ BORDER = "#e7e1d4"
 RADIUS = 10
 
 
-class ColorLegendPanel(ctk.CTkScrollableFrame):
+class ColorLegendPanel(ctk.CTkFrame):
     """颜色图例。"""
 
     def __init__(self, master):

@@ -45,7 +45,7 @@ def _make_card(parent, title: str) -> ctk.CTkFrame:
     return card, content
 
 
-class ControlPanel(ctk.CTkScrollableFrame):
+class ControlPanel(ctk.CTkFrame):
     """参数控制面板。"""
 
     ZOOM_LEVELS = [5, 8, 10, 12, 15, 18, 20, 25, 30, 40, 50]
