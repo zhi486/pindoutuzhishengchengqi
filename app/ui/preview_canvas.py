@@ -3,11 +3,6 @@
 import customtkinter as ctk
 from PIL import Image, ImageTk
 from typing import Optional
-import numpy as np
-
-from app.core.pixelizer import (upsample_for_preview, draw_grid_lines,
-                                draw_board_lines, add_coordinate_labels,
-                                draw_color_codes)
 
 
 CARD   = "#fffdf8"
@@ -33,41 +28,39 @@ class PreviewCanvas(ctk.CTkFrame):
         self.canvas = ctk.CTkCanvas(self, bg="#fffdf8", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, padx=2, pady=2)
 
+        # 居中占位文字（使用 Label 而非 canvas.create_text，自动居中）
+        self.placeholder = ctk.CTkLabel(
+            self, text="请先加载图片",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=14),
+            text_color=SUB,
+        )
+        self.placeholder.place(relx=0.5, rely=0.5, anchor="center")
+
         # 滚动条
         self.scrollbar_y = ctk.CTkScrollbar(
-            self, orientation="vertical", command=self.canvas.yview
-        )
+            self, orientation="vertical", command=self.canvas.yview)
         self.scrollbar_x = ctk.CTkScrollbar(
-            self, orientation="horizontal", command=self.canvas.xview
-        )
+            self, orientation="horizontal", command=self.canvas.xview)
         self.canvas.configure(
             yscrollcommand=self.scrollbar_y.set,
             xscrollcommand=self.scrollbar_x.set,
         )
-
         self.scrollbar_y.pack(side="right", fill="y")
         self.scrollbar_x.pack(side="bottom", fill="x")
 
-        # 占位提示
-        self.canvas.create_text(
-            200, 200,
-            text="请先加载图片",
-            fill=SUB,
-            font=("Microsoft YaHei", 14),
-        )
-
-    def show_pattern(
-        self,
-        pattern,
-        params: dict,
-        palette=None,
-        tile_size: int = None,
-    ):
+    def show_pattern(self, pattern, params: dict, palette=None, tile_size: int = None):
         if tile_size is None:
             tile_size = self.DEFAULT_TILE_SIZE
-
         if pattern.grid is None or pattern.grid.size == 0:
             return
+
+        # 隐藏占位文字
+        self.placeholder.place_forget()
+
+        # 延迟导入避免循环依赖
+        from app.core.pixelizer import (upsample_for_preview, draw_grid_lines,
+                                        draw_board_lines, add_coordinate_labels,
+                                        draw_color_codes)
 
         preview = upsample_for_preview(pattern.grid, tile_size)
 
@@ -90,8 +83,7 @@ class PreviewCanvas(ctk.CTkFrame):
         self.current_image = ImageTk.PhotoImage(preview)
         self.canvas.delete("all")
         self.canvas_image_id = self.canvas.create_image(
-            0, 0, anchor="nw", image=self.current_image
-        )
+            0, 0, anchor="nw", image=self.current_image)
         self.canvas.configure(scrollregion=(0, 0, preview.width, preview.height))
         self.scrollbar_y.set(0, 1)
         self.scrollbar_x.set(0, 1)
