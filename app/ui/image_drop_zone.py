@@ -37,7 +37,8 @@ class ImageDropZone(ctk.CTkFrame):
                                    width=46, height=46, corner_radius=12)
         icon_frame.pack(pady=(0, 8))
         icon_frame.pack_propagate(False)
-        ctk.CTkLabel(icon_frame, text="🖼️", font=ctk.CTkFont(size=20)).pack(expand=True)
+        icon_lbl = ctk.CTkLabel(icon_frame, text="🖼️", font=ctk.CTkFont(size=20))
+        icon_lbl.place(relx=0.5, rely=0.5, anchor="center")
 
         # 主提示
         self.label = ctk.CTkLabel(
@@ -58,7 +59,7 @@ class ImageDropZone(ctk.CTkFrame):
         hint.pack(pady=(2, 0))
 
         # 整个区域可点击
-        for w in (self, inner, icon_frame, self.label, hint):
+        for w in (self, inner, icon_frame, icon_lbl, self.label, hint):
             w.bind("<Button-1>", lambda e: self._browse_file())
 
     def _browse_file(self):
