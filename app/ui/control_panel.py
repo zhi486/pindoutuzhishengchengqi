@@ -105,8 +105,9 @@ class ControlPanel(ctk.CTkScrollableFrame):
         # ═══ 卡片 2: 图纸参数 ═══
         card2, c2 = _make_card(self, "图纸参数")
 
+        self.bead_h_var = ctk.IntVar(value=52)
         self._build_row(c2, "豆子长度", 5, 200, 52,
-                        self.bead_h_var := ctk.IntVar(value=52),
+                        self.bead_h_var,
                         self._on_bead_h, self._on_bead_h)
         self.bead_w_label = ctk.CTkLabel(
             c2, text="宽度: — 列", anchor="w",
@@ -114,8 +115,9 @@ class ControlPanel(ctk.CTkScrollableFrame):
             text_color=SUB)
         self.bead_w_label.pack(fill="x", pady=(0, 4))
 
+        self.max_colors_var = ctk.IntVar(value=50)
         self._build_row(c2, "最大颜色", 4, 150, 50,
-                        self.max_colors_var := ctk.IntVar(value=50),
+                        self.max_colors_var,
                         self._on_max_colors, self._on_max_colors)
 
         card2.pack(fill="x", pady=(0, 8))
