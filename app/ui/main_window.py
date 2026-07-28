@@ -84,7 +84,7 @@ class MainWindow(ctk.CTk):
             on_zoom_changed=self._on_zoom_changed,
             on_export_png=self._on_export_png,
             on_export_pdf=self._on_export_pdf,
-            on_palette_mode_changed=self._on_palette_mode_changed,
+            on_material_changed=self._on_material_changed,
         )
         self.control_panel.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
@@ -118,14 +118,17 @@ class MainWindow(ctk.CTk):
         else:
             self._regenerate()
 
-    def _on_palette_mode_changed(self, mode: str):
-        """色卡模式切换回调。"""
-        try:
-            self.controller.palette_mode = mode
-            self.status_bar.show(f"已切换到 {mode} 色卡 ({self.controller.palette.n_colors} 色)")
-            self._regenerate()
-        except Exception as e:
-            self.status_bar.show(f"切换色卡失败: {e}")
+    def _on_material_changed(self, material: str):
+        """豆子材质切换回调 —— 重新处理并更新提示。"""
+        self.controller.material_mode = material
+        self._update_material_note()
+        self.status_bar.show(f"已切换材质: {material} · {self.controller.palette.n_colors} 色")
+        self._regenerate()
+
+    def _update_material_note(self):
+        """显示半透明材质提示。"""
+        note = self.controller.get_material_note()
+        self.control_panel.show_material_note(note)
 
     def _on_zoom_changed(self, tile_size: int):
         """缩放变更回调 —— 仅重渲染预览，不重新计算管道。"""
@@ -178,7 +181,7 @@ class MainWindow(ctk.CTk):
         """构建状态栏文本。"""
         w, h = pattern.bead_size
         parts = [f"{w} × {h} 豆子"]
-        parts.append(f"{self.controller.palette_mode}色卡")
+        parts.append(f"MARD · {self.controller.material_mode}")
         parts.append(f"{pattern.unique_colors} 种颜色")
         parts.append(f"共 {pattern.total_beads} 颗")
         if pattern.board_layout:

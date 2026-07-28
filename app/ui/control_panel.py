@@ -14,36 +14,44 @@ class ControlPanel(ctk.CTkScrollableFrame):
         on_zoom_changed: Callable[[int], None],
         on_export_png: Callable[[], None],
         on_export_pdf: Callable[[], None],
-        on_palette_mode_changed: Callable[[str], None] = None,
+        on_material_changed: Callable[[str], None] = None,
     ):
         super().__init__(master, label_text="参数设置", width=250)
         self.on_param_changed = on_param_changed
         self.on_zoom_changed = on_zoom_changed
-        self.on_palette_mode_changed = on_palette_mode_changed
+        self.on_material_changed = on_material_changed
         self._tile_size = 20
 
-        # ── 色卡模式切换 ──
-        ctk.CTkLabel(self, text="色卡模式", anchor="w").pack(
+        # ── 品牌（固定 MARD） ──
+        ctk.CTkLabel(self, text="品牌", anchor="w").pack(
             fill="x", padx=10, pady=(10, 0)
         )
-
-        mode_frame = ctk.CTkFrame(self, fg_color="transparent")
-        mode_frame.pack(fill="x", padx=10, pady=(2, 0))
-
-        self.palette_mode_var = ctk.StringVar(value="291")
-        self.btn_291 = ctk.CTkButton(
-            mode_frame, text="291 色", width=90, height=30,
-            command=lambda: self._on_palette_mode("291"),
-            fg_color="#3B82F6", hover_color="#2563EB",
+        ctk.CTkLabel(self, text="MARD", anchor="w",
+                      font=ctk.CTkFont(size=14, weight="bold")).pack(
+            fill="x", padx=10, pady=(2, 0)
         )
-        self.btn_291.pack(side="left", padx=(0, 5))
 
-        self.btn_221 = ctk.CTkButton(
-            mode_frame, text="221 色", width=90, height=30,
-            command=lambda: self._on_palette_mode("221"),
-            fg_color="#6B7280", hover_color="#4B5563",
+        # ── 豆子材质 ──
+        ctk.CTkLabel(self, text="豆子材质", anchor="w").pack(
+            fill="x", padx=10, pady=(10, 0)
         )
-        self.btn_221.pack(side="left")
+        self.material_var = ctk.StringVar(value="实色")
+        self.material_menu = ctk.CTkOptionMenu(
+            self,
+            values=["实色", "半透明"],
+            variable=self.material_var,
+            command=self._on_material,
+        )
+        self.material_menu.pack(fill="x", padx=10, pady=(2, 0))
+
+        # 半透明提示
+        self.material_note = ctk.CTkLabel(
+            self, text="", anchor="w",
+            text_color="#8a6d14",
+            font=ctk.CTkFont(size=11),
+            wraplength=210,
+            justify="left",
+        )
 
         # ── 豆子长度（行数）──
         ctk.CTkLabel(self, text="豆子长度（行数）", anchor="w").pack(
@@ -131,7 +139,7 @@ class ControlPanel(ctk.CTkScrollableFrame):
         self.board_type_var = ctk.StringVar(value="52×52")
         self.board_menu = ctk.CTkOptionMenu(
             self,
-            values=["52×52", "72×72", "102×102"],
+            values=["52×52", "104×104", "208×208"],
             variable=self.board_type_var,
             command=self._on_board_type,
         )
@@ -194,19 +202,20 @@ class ControlPanel(ctk.CTkScrollableFrame):
         )
         self.export_pdf_btn.pack(pady=(5, 10))
 
-    # ── 色卡模式 ──────────────────────────────────
+    # ── 豆子材质 ──────────────────────────────────
 
-    def _on_palette_mode(self, mode: str):
-        """切换色卡模式，更新按钮高亮状态。"""
-        self.palette_mode_var.set(mode)
-        if mode == "291":
-            self.btn_291.configure(fg_color="#3B82F6", hover_color="#2563EB")
-            self.btn_221.configure(fg_color="#6B7280", hover_color="#4B5563")
+    def _on_material(self, choice: str):
+        """豆子材质切换。"""
+        if self.on_material_changed:
+            self.on_material_changed(choice)
+
+    def show_material_note(self, text: str):
+        """显示或隐藏材质提示（半透明时显示）。"""
+        if text:
+            self.material_note.configure(text=text)
+            self.material_note.pack(fill="x", padx=10, pady=(5, 0))
         else:
-            self.btn_221.configure(fg_color="#3B82F6", hover_color="#2563EB")
-            self.btn_291.configure(fg_color="#6B7280", hover_color="#4B5563")
-        if self.on_palette_mode_changed:
-            self.on_palette_mode_changed(mode)
+            self.material_note.pack_forget()
 
     # ── 豆子长度 ──────────────────────────────────
 

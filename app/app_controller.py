@@ -34,24 +34,32 @@ class AppController:
     Attributes:
         original_image: 原始 PIL Image
         current_pattern: 当前处理结果 (Pattern)
-        palette_mode: "291" 或 "221"
+        material_mode: 豆子材质类型（实色 / 半透明）
         params: 当前参数字典
     """
 
     def __init__(self):
         data_dir = _get_data_dir()
 
-        # 加载两套色卡
-        self._palette_291 = BeadPalette(os.path.join(data_dir, "perler_colors.json"))
-        self._palette_221_path = os.path.join(data_dir, "perler_colors_221.json")
-        self._palette_221 = None
-        if os.path.exists(self._palette_221_path):
+        # 加载三套色卡：全色、实色、半透明
+        self._palette_full = BeadPalette(os.path.join(data_dir, "perler_colors.json"))
+        self._palette_solid = None
+        solid_path = os.path.join(data_dir, "perler_colors_221.json")
+        if os.path.exists(solid_path):
             try:
-                self._palette_221 = BeadPalette(self._palette_221_path)
+                self._palette_solid = BeadPalette(solid_path)
             except Exception:
-                self._palette_221 = None
+                self._palette_solid = None
 
-        self._palette_mode = "291"
+        self._palette_trans = None
+        trans_path = os.path.join(data_dir, "perler_colors_transparent.json")
+        if os.path.exists(trans_path):
+            try:
+                self._palette_trans = BeadPalette(trans_path)
+            except Exception:
+                self._palette_trans = None
+
+        self._material_mode = "实色"  # 实色 / 半透明
         self.original_image: Optional[Image.Image] = None
         self.current_pattern: Optional[Pattern] = None
 
@@ -61,35 +69,43 @@ class AppController:
             "max_colors": 50,
             "show_grid": True,
             "show_board_lines": True,
-            "show_color_codes": True,  # 默认开启色号
+            "show_color_codes": True,
             "board_width": 52,
             "board_height": 52,
         }
 
-    # ── 色卡管理 ──────────────────────────────────
+    # ── 色卡 / 材质管理 ──────────────────────────────
 
     @property
     def palette(self) -> BeadPalette:
-        """当前激活的色卡。"""
-        if self._palette_mode == "221" and self._palette_221 is not None:
-            return self._palette_221
-        return self._palette_291
+        """根据当前材质返回对应色卡：实色→221，半透明→70色透明。"""
+        if self._material_mode == "半透明" and self._palette_trans is not None:
+            return self._palette_trans
+        if self._palette_solid is not None:
+            return self._palette_solid
+        return self._palette_full
 
     @property
-    def palette_mode(self) -> str:
-        return self._palette_mode
+    def material_mode(self) -> str:
+        """当前豆子材质类型。"""
+        return self._material_mode
 
-    @palette_mode.setter
-    def palette_mode(self, mode: str):
-        if mode not in ("291", "221"):
-            raise ValueError(f"无效的色卡模式: {mode}")
-        if mode == "221" and self._palette_221 is None:
-            raise FileNotFoundError(f"221色数据文件不存在: {self._palette_221_path}")
-        self._palette_mode = mode
+    @material_mode.setter
+    def material_mode(self, value: str):
+        if value not in ("实色", "半透明"):
+            raise ValueError(f"无效的材质类型: {value}")
+        self._material_mode = value
 
-    def has_221_palette(self) -> bool:
-        """221 色卡是否可用。"""
-        return self._palette_221 is not None
+    def get_material_note(self) -> str:
+        """返回半透明材质的提示信息。"""
+        if self._material_mode == "半透明":
+            return ("⚠️ 半透明豆子拼在底板上会透出底板颜色，"
+                    "成品效果与实色不同，建议先确认底板颜色。")
+        return ""
+
+    def has_solid_palette(self) -> bool:
+        """实色色卡是否可用。"""
+        return self._palette_solid is not None
 
     # ── 图片管理 ──────────────────────────────────
 
