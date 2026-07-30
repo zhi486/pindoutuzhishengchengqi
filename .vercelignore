@@ -1,0 +1,11 @@
+main.py
+app/
+assets/
+data/
+mobile/
+dist/
+*.py
+*.pyc
+*.txt
+.gitignore
+README.md
