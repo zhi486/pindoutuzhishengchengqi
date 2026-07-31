@@ -53,7 +53,9 @@ body {
 .upload-hint { font-size: 11.5px; color: var(--sub); margin-top: 3px; }
 
 /* ===== Preview ===== */
-.preview-wrap { flex: 1; position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 2px rgba(35,29,23,.04), 0 10px 28px rgba(35,29,23,.05); overflow: auto; display: flex; align-items: center; justify-content: center; min-height: 340px; padding: 18px; }
+.preview-wrap { flex: 1; position: relative; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 2px rgba(35,29,23,.04), 0 10px 28px rgba(35,29,23,.05); overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 340px; padding: 18px; touch-action: none; cursor: grab; }
+.preview-wrap:active { cursor: grabbing; }
+.preview-wrap.panning { cursor: grabbing; }
 canvas#preview { image-rendering: pixelated; background: #fff; border-radius: 3px; box-shadow: 0 0 0 1px var(--border); }
 .preview-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--sub); pointer-events: none; }
 .pe-icon { font-size: 30px; opacity: .5; }
@@ -145,6 +147,80 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
   .preview-wrap { min-height: 280px; }
   .header-tag { display: none; }
 }
+
+/* ===== Crop Overlay ===== */
+.crop-overlay {
+  display: none; position: fixed; inset: 0; z-index: 100;
+  background: #1a1a1e; flex-direction: column; align-items: center;
+}
+.crop-overlay.active { display: flex; }
+.crop-toolbar {
+  width: 100%; display: flex; align-items: center;
+  justify-content: space-between; padding: 10px 20px;
+  box-sizing: border-box; flex-shrink: 0;
+}
+.crop-toolbar .crop-hint {
+  color: #777; font-size: 13px; text-align: center; flex: 1;
+}
+.crop-toolbar button {
+  padding: 8px 20px; font-size: 13px; font-weight: 600;
+  border-radius: 9px; border: 1px solid; cursor: pointer;
+  font-family: inherit; transition: background .15s;
+}
+.crop-skip-btn {
+  background: transparent; color: #999;
+  border-color: rgba(255,255,255,.12);
+}
+.crop-skip-btn:hover { background: rgba(255,255,255,.08); }
+.crop-ok-btn {
+  background: var(--accent); color: #fff;
+  border-color: rgba(0,0,0,.08);
+  box-shadow: 0 1px 2px rgba(224,90,43,.25);
+}
+.crop-ok-btn:hover { background: var(--accent-hover); }
+
+.crop-stage-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; width: 100%; padding: 10px;
+}
+.crop-stage {
+  position: relative; overflow: visible;
+  background-color: #2a2a30;
+  background-image:
+    linear-gradient(45deg, #383840 25%, transparent 25%),
+    linear-gradient(-45deg, #383840 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #383840 75%),
+    linear-gradient(-45deg, transparent 75%, #383840 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  border-radius: 6px; border: 2px solid #444;
+}
+.crop-img {
+  display: block; position: absolute; user-select: none;
+  pointer-events: none;
+}
+.crop-frame {
+  position: absolute;
+  border: 2px dashed rgba(255,255,255,.85);
+  box-shadow: 0 0 0 4000px rgba(0,0,0,.55);
+  cursor: move;
+}
+.crop-handle {
+  position: absolute; width: 22px; height: 22px;
+  background: #fff; border: 2px solid var(--accent);
+  border-radius: 5px; z-index: 10;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  cursor: nwse-resize;
+}
+.crop-handle--br { right: -11px; bottom: -11px; }
+.crop-grid-h {
+  position: absolute; left: 0; right: 0;
+  border-top: 1px solid rgba(255,255,255,.18);
+}
+.crop-grid-v {
+  position: absolute; top: 0; bottom: 0;
+  border-left: 1px solid rgba(255,255,255,.18);
+}
 </style>
 </head>
 <body>
@@ -161,7 +237,7 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
         <p>图片转拼豆图纸 · 自动匹配色号清单</p>
       </div>
     </div>
-    <span class="header-tag">WEB 版</span>
+    <span class="header-tag" id="versionTag" title="版本标识">WEB · v250801a</span>
   </div>
 </header>
 <div class="layout">
@@ -172,6 +248,9 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
       <div class="upload-icon">🖼️</div>
       <div class="upload-text"><strong>点击选择图片</strong>，或直接拖放到此处</div>
       <div class="upload-hint">支持 JPG / PNG / WebP · 图片仅在本地处理</div>
+      <div class="upload-actions" id="uploadActions" style="display:none;margin-top:10px">
+        <button class="btn btn-accent" onclick="event.stopPropagation();startCrop()" style="font-size:12px;padding:6px 14px">✂ 裁剪图片</button>
+      </div>
     </div>
     <div class="preview-wrap" id="previewWrap">
       <canvas id="preview"></canvas>
@@ -255,11 +334,33 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
         <button class="btn btn-accent" onclick="exportPNG()">导出 PNG</button>
         <button class="btn btn-dark" onclick="exportPDF()">导出 PDF</button>
       </div>
+      <button class="btn btn-dark" onclick="startCrop()" id="recropBtn" style="display:none;margin-top:8px;width:100%">✂ 重新裁剪</button>
     </div>
 
     <div class="card">
       <div class="card-title">颜色图例</div>
       <div id="legend"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Crop Overlay -->
+<div class="crop-overlay" id="cropOverlay">
+  <div class="crop-toolbar">
+    <button class="crop-skip-btn" id="cropSkipBtn">跳过裁剪</button>
+    <span class="crop-hint">拖拽移动裁剪框 · 拖拽右下角调整大小 · 滚轮缩放</span>
+    <button class="crop-ok-btn" id="cropOkBtn">确认裁剪</button>
+  </div>
+  <div class="crop-stage-wrap" id="cropStageWrap">
+    <div class="crop-stage" id="cropStage">
+      <img class="crop-img" id="cropImage" draggable="false" />
+      <div class="crop-frame" id="cropFrame">
+        <div class="crop-handle crop-handle--br"></div>
+        <div class="crop-grid-h" style="top:33.33%"></div>
+        <div class="crop-grid-h" style="top:66.67%"></div>
+        <div class="crop-grid-v" style="left:33.33%"></div>
+        <div class="crop-grid-v" style="left:66.67%"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -448,16 +549,30 @@ function quantize(grid, maxColors) {
 // ==================== State ====================
 let imgOriginal = null, patternGrid = null, patternIdx = null;
 let tileSize = 20, beadH = 52;
+let cropRect = null;  // { sx, sy, sw, sh } in original image coords, null = full image
+let panX = 0, panY = 0;  // preview canvas drag offset
 
 const ZOOM_LEVELS = [5,8,10,12,15,18,20,25,30,40,50];
 
 // ==================== Image Loading ====================
+function _loadImage(file) {
+  let img = new Image();
+  img.onload = () => {
+    imgOriginal = img;
+    cropRect = null;
+    panX = 0; panY = 0;
+    // 显示裁剪按钮
+    document.getElementById('uploadActions').style.display = '';
+    document.getElementById('recropBtn').style.display = '';
+    process();
+  };
+  img.src = URL.createObjectURL(file);
+}
+
 document.getElementById('fileInput').addEventListener('change', e => {
   let f = e.target.files[0];
   if (!f) return;
-  let img = new Image();
-  img.onload = () => { imgOriginal = img; process(); };
-  img.src = URL.createObjectURL(f);
+  _loadImage(f);
 });
 
 const uploadZone = document.getElementById('uploadZone');
@@ -466,9 +581,7 @@ uploadZone.addEventListener('drop', e => {
   e.preventDefault();
   let f = e.dataTransfer.files[0];
   if (f && f.type.startsWith('image/')) {
-    let img = new Image();
-    img.onload = () => { imgOriginal = img; process(); };
-    img.src = URL.createObjectURL(f);
+    _loadImage(f);
   }
 });
 
@@ -477,7 +590,18 @@ function process() {
   if (!imgOriginal) return;
   let maxColors = parseInt(document.getElementById('maxColors').value);
   beadH = parseInt(document.getElementById('beadH').value);
-  let beadW = Math.max(1, Math.round(imgOriginal.width / imgOriginal.height * beadH));
+
+  // Determine source region (support crop)
+  let srcX, srcY, srcW, srcH;
+  if (cropRect) {
+    srcX = cropRect.sx; srcY = cropRect.sy;
+    srcW = cropRect.sw; srcH = cropRect.sh;
+  } else {
+    srcX = 0; srcY = 0;
+    srcW = imgOriginal.width; srcH = imgOriginal.height;
+  }
+
+  let beadW = Math.max(1, Math.round(srcW / srcH * beadH));
   document.getElementById('beadWInfo').textContent = `宽度: ${beadW} 列`;
 
   let canvas = document.createElement('canvas');
@@ -485,7 +609,7 @@ function process() {
   let ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(imgOriginal, 0, 0, beadW, beadH);
+  ctx.drawImage(imgOriginal, srcX, srcY, srcW, srcH, 0, 0, beadW, beadH);
   let data = ctx.getImageData(0, 0, beadW, beadH).data;
 
   // Build color grid
@@ -531,6 +655,280 @@ function process() {
   document.getElementById('status').textContent = `${beadW}×${beadH} 豆子 | ${paletteLabel()} | ${sorted.length} 种颜色 | 共 ${total} 颗`;
   render();
 }
+
+// ==================== Crop Mode ====================
+let cropState = null;  // see startCrop() for shape
+
+function startCrop() {
+  if (!imgOriginal) return;
+  const maxW = Math.min(window.innerWidth * 0.88, 1200);
+  const maxH = window.innerHeight * 0.62;
+  const aspect = imgOriginal.width / imgOriginal.height;
+  let dW, dH;
+  if (imgOriginal.width / maxW > imgOriginal.height / maxH) {
+    dW = maxW; dH = Math.round(dW / aspect);
+  } else {
+    dH = maxH; dW = Math.round(dH * aspect);
+  }
+  const pad = 44;
+  const stageW = dW + pad * 2, stageH = dH + pad * 2;
+  const imgLeft = pad, imgTop = pad;
+
+  // Initial frame: if re-cropping, map previous cropRect back; else 60% of image
+  let fx, fy, fw, fh;
+  if (cropRect) {
+    const s = imgOriginal.width / dW;
+    fx = imgLeft + Math.round(cropRect.sx / s);
+    fy = imgTop + Math.round(cropRect.sy / s);
+    fw = Math.round(cropRect.sw / s);
+    fh = Math.round(cropRect.sh / s);
+    // Clamp to image area
+    fx = Math.max(imgLeft, Math.min(imgLeft + dW - 20, fx));
+    fy = Math.max(imgTop, Math.min(imgTop + dH - 20, fy));
+    fw = Math.min(dW - (fx - imgLeft), fw);
+    fh = Math.min(dH - (fy - imgTop), fh);
+  } else {
+    const m = 0.6;
+    fw = Math.round(dW * m); fh = Math.round(dH * m);
+    fx = imgLeft + Math.round((dW - fw) / 2);
+    fy = imgTop + Math.round((dH - fh) / 2);
+  }
+
+  cropState = {
+    displayW: dW, displayH: dH,
+    imgLeft, imgTop,
+    frameX: fx, frameY: fy, frameW: fw, frameH: fh,
+    stageW, stageH,
+    dragMode: null,  // 'move' | 'resize' | null
+    dragStartX: 0, dragStartY: 0,
+    dragStartFX: 0, dragStartFY: 0,
+    dragStartFW: 0, dragStartFH: 0,
+    // pinch state
+    pinchStartDist: 0, pinchStartW: 0, pinchStartH: 0,
+    pinchCX: 0, pinchCY: 0
+  };
+
+  const stage = document.getElementById('cropStage');
+  const img = document.getElementById('cropImage');
+  stage.style.width = stageW + 'px';
+  stage.style.height = stageH + 'px';
+  img.src = imgOriginal.src;
+  img.style.width = dW + 'px';
+  img.style.height = dH + 'px';
+  img.style.left = imgLeft + 'px';
+  img.style.top = imgTop + 'px';
+
+  _updateCropFrameUI();
+  document.getElementById('cropOverlay').classList.add('active');
+}
+
+function _updateCropFrameUI() {
+  const frame = document.getElementById('cropFrame');
+  frame.style.left = cropState.frameX + 'px';
+  frame.style.top = cropState.frameY + 'px';
+  frame.style.width = cropState.frameW + 'px';
+  frame.style.height = cropState.frameH + 'px';
+}
+
+function _cropToLocal(clientX, clientY) {
+  const stage = document.getElementById('cropStage');
+  const rect = stage.getBoundingClientRect();
+  return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+function _cropClamp() {
+  const cs = cropState;
+  const il = cs.imgLeft, it = cs.imgTop, iw = cs.displayW, ih = cs.displayH;
+  // Clamp position
+  cs.frameX = Math.max(il, Math.min(il + iw - cs.frameW, cs.frameX));
+  cs.frameY = Math.max(it, Math.min(it + ih - cs.frameH, cs.frameY));
+  // Clamp size
+  cs.frameW = Math.max(60, Math.min(iw - (cs.frameX - il), cs.frameW));
+  cs.frameH = Math.max(60, Math.min(ih - (cs.frameY - it), cs.frameH));
+}
+
+// --- Crop mouse handlers ---
+document.getElementById('cropOverlay').addEventListener('mousedown', function(e) {
+  if (!cropState || e.button !== 0) return;
+  const p = _cropToLocal(e.clientX, e.clientY);
+  const cs = cropState;
+  const HW = 22;
+  // Hit test: resize handle (bottom-right corner)
+  if (Math.abs(p.x - (cs.frameX + cs.frameW)) < HW && Math.abs(p.y - (cs.frameY + cs.frameH)) < HW) {
+    cs.dragMode = 'resize';
+    cs.dragStartX = p.x; cs.dragStartY = p.y;
+    cs.dragStartFW = cs.frameW; cs.dragStartFH = cs.frameH;
+    e.preventDefault();
+  // Hit test: inside frame → move
+  } else if (p.x >= cs.frameX && p.x <= cs.frameX + cs.frameW &&
+             p.y >= cs.frameY && p.y <= cs.frameY + cs.frameH) {
+    cs.dragMode = 'move';
+    cs.dragStartX = p.x; cs.dragStartY = p.y;
+    cs.dragStartFX = cs.frameX; cs.dragStartFY = cs.frameY;
+    e.preventDefault();
+  }
+});
+
+window.addEventListener('mousemove', function(e) {
+  if (!cropState || !cropState.dragMode) return;
+  const p = _cropToLocal(e.clientX, e.clientY);
+  const cs = cropState;
+  if (cs.dragMode === 'move') {
+    cs.frameX = cs.dragStartFX + (p.x - cs.dragStartX);
+    cs.frameY = cs.dragStartFY + (p.y - cs.dragStartY);
+    _cropClamp();
+    _updateCropFrameUI();
+  } else if (cs.dragMode === 'resize') {
+    cs.frameW = Math.max(60, cs.dragStartFW + (p.x - cs.dragStartX));
+    cs.frameH = Math.max(60, cs.dragStartFH + (p.y - cs.dragStartY));
+    _cropClamp();
+    _updateCropFrameUI();
+  }
+});
+
+window.addEventListener('mouseup', function() {
+  if (cropState) cropState.dragMode = null;
+});
+
+// --- Crop touch handlers ---
+function _getTouchDist(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+document.getElementById('cropOverlay').addEventListener('touchstart', function(e) {
+  if (!cropState) return;
+  if (e.touches.length >= 2) {
+    const p0 = _cropToLocal(e.touches[0].clientX, e.touches[0].clientY);
+    const p1 = _cropToLocal(e.touches[1].clientX, e.touches[1].clientY);
+    const dx = Math.abs(p0.x - p1.x), dy = Math.abs(p0.y - p1.y);
+    if (dx > 20 || dy > 20) {
+      cropState.dragMode = 'pinch';
+      cropState.pinchStartDist = _getTouchDist(e.touches);
+      cropState.pinchStartW = cropState.frameW;
+      cropState.pinchStartH = cropState.frameH;
+      cropState.pinchCX = cropState.frameX + cropState.frameW / 2;
+      cropState.pinchCY = cropState.frameY + cropState.frameH / 2;
+    }
+    e.preventDefault();
+  } else if (e.touches.length === 1) {
+    const p = _cropToLocal(e.touches[0].clientX, e.touches[0].clientY);
+    const cs = cropState;
+    const HW = 24;
+    let handled = false;
+    if (Math.abs(p.x - (cs.frameX + cs.frameW)) < HW && Math.abs(p.y - (cs.frameY + cs.frameH)) < HW) {
+      cs.dragMode = 'resize';
+      cs.dragStartX = p.x; cs.dragStartY = p.y;
+      cs.dragStartFW = cs.frameW; cs.dragStartFH = cs.frameH;
+      handled = true;
+    } else if (p.x >= cs.frameX && p.x <= cs.frameX + cs.frameW &&
+               p.y >= cs.frameY && p.y <= cs.frameY + cs.frameH) {
+      cs.dragMode = 'move';
+      cs.dragStartX = p.x; cs.dragStartY = p.y;
+      cs.dragStartFX = cs.frameX; cs.dragStartFY = cs.frameY;
+      handled = true;
+    }
+    if (handled) e.preventDefault();
+  }
+}, { passive: false });
+
+document.getElementById('cropOverlay').addEventListener('touchmove', function(e) {
+  if (!cropState || !cropState.dragMode) return;
+  if (cropState.dragMode === 'pinch' && e.touches.length >= 2) {
+    const dist = _getTouchDist(e.touches);
+    const sx = Math.max(0.3, Math.min(3, dist / Math.max(1, cropState.pinchStartDist)));
+    const cs = cropState;
+    let nw = Math.round(cs.pinchStartW * sx);
+    let nh = Math.round(cs.pinchStartH * sx);
+    let nx = Math.round(cs.pinchCX - nw / 2);
+    let ny = Math.round(cs.pinchCY - nh / 2);
+    cs.frameX = nx; cs.frameY = ny;
+    cs.frameW = nw; cs.frameH = nh;
+    _cropClamp();
+    _updateCropFrameUI();
+    e.preventDefault();
+  } else if (e.touches.length === 1) {
+    const p = _cropToLocal(e.touches[0].clientX, e.touches[0].clientY);
+    const cs = cropState;
+    if (cs.dragMode === 'move') {
+      cs.frameX = cs.dragStartFX + (p.x - cs.dragStartX);
+      cs.frameY = cs.dragStartFY + (p.y - cs.dragStartY);
+      _cropClamp();
+      _updateCropFrameUI();
+      e.preventDefault();
+    } else if (cs.dragMode === 'resize') {
+      cs.frameW = Math.max(60, cs.dragStartFW + (p.x - cs.dragStartX));
+      cs.frameH = Math.max(60, cs.dragStartFH + (p.y - cs.dragStartY));
+      _cropClamp();
+      _updateCropFrameUI();
+      e.preventDefault();
+    }
+  }
+}, { passive: false });
+
+document.getElementById('cropOverlay').addEventListener('touchend', function() {
+  if (cropState) cropState.dragMode = null;
+});
+
+// --- Crop stage zoom (scroll wheel) ---
+document.getElementById('cropStageWrap').addEventListener('wheel', function(e) {
+  if (!cropState) return;
+  e.preventDefault();
+  const cs = cropState;
+  const stage = document.getElementById('cropStage');
+  const rect = stage.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+  // Simple zoom: scale the crop frame around cursor
+  const factor = e.deltaY < 0 ? 1.08 : 0.925;
+  const newW = Math.round(cs.frameW * factor);
+  const newH = Math.round(cs.frameH * factor);
+  if (newW < 60 || newH < 60) return;
+  if (newW > cs.displayW || newH > cs.displayH) return;
+
+  // Keep the point under cursor stable
+  const relX = (mx - cs.frameX) / cs.frameW;
+  const relY = (my - cs.frameY) / cs.frameH;
+  cs.frameX = Math.round(mx - relX * newW);
+  cs.frameY = Math.round(my - relY * newH);
+  cs.frameW = newW; cs.frameH = newH;
+  _cropClamp();
+  _updateCropFrameUI();
+}, { passive: false });
+
+function confirmCrop() {
+  if (!cropState) return;
+  const cs = cropState;
+  const scale = imgOriginal.width / cs.displayW;
+  const ix = cs.frameX - cs.imgLeft;
+  const iy = cs.frameY - cs.imgTop;
+  const cx = Math.max(0, Math.min(cs.displayW - 1, ix));
+  const cy = Math.max(0, Math.min(cs.displayH - 1, iy));
+  const cw = Math.max(1, Math.min(cs.displayW - cx, cs.frameW - Math.max(0, -ix)));
+  const ch = Math.max(1, Math.min(cs.displayH - cy, cs.frameH - Math.max(0, -iy)));
+
+  cropRect = {
+    sx: Math.round(cx * scale),
+    sy: Math.round(cy * scale),
+    sw: Math.round(cw * scale),
+    sh: Math.round(ch * scale)
+  };
+
+  document.getElementById('cropOverlay').classList.remove('active');
+  cropState = null;
+  panX = 0; panY = 0;
+  process();
+}
+
+function skipCrop() {
+  // 不改变 cropRect，直接关闭
+  document.getElementById('cropOverlay').classList.remove('active');
+  cropState = null;
+}
+
+document.getElementById('cropSkipBtn').addEventListener('click', skipCrop);
+document.getElementById('cropOkBtn').addEventListener('click', confirmCrop);
 
 // ==================== Rendering ====================
 function render() {
@@ -645,7 +1043,101 @@ function render() {
     ctx.fillText(String(r+1), marginLeft - 4, marginTop + r*tileSize + tileSize/2);
   }
   ctx.textBaseline = 'alphabetic';
+
+  // Apply pan offset
+  canvas.style.transform = `translate(${panX}px, ${panY}px)`;
+  canvas.style.transformOrigin = '0 0';
 }
+
+// ==================== Preview Pan & Zoom ====================
+const previewWrap = document.getElementById('previewWrap');
+
+// Mouse drag → pan
+let _panStart = null;
+previewWrap.addEventListener('pointerdown', function(e) {
+  if (!patternGrid) return;
+  _panStart = { x: e.clientX - panX, y: e.clientY - panY };
+  previewWrap.classList.add('panning');
+  previewWrap.setPointerCapture(e.pointerId);
+});
+
+previewWrap.addEventListener('pointermove', function(e) {
+  if (!_panStart) return;
+  panX = e.clientX - _panStart.x;
+  panY = e.clientY - _panStart.y;
+  const canvas = document.getElementById('preview');
+  canvas.style.transform = `translate(${panX}px, ${panY}px)`;
+});
+
+previewWrap.addEventListener('pointerup', function(e) {
+  _panStart = null;
+  previewWrap.classList.remove('panning');
+});
+
+previewWrap.addEventListener('pointerleave', function() {
+  _panStart = null;
+  previewWrap.classList.remove('panning');
+});
+
+// Scroll wheel → zoom
+previewWrap.addEventListener('wheel', function(e) {
+  if (!patternGrid) return;
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) {
+    // Pinch-like on trackpad: scale around cursor
+    const rect = previewWrap.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const canvas = document.getElementById('preview');
+    const oldScale = tileSize;
+    let newTileSize = tileSize;
+    if (e.deltaY < 0) {
+      for (let z of ZOOM_LEVELS) { if (z > newTileSize) { newTileSize = z; break; } }
+      if (newTileSize === tileSize) newTileSize = Math.min(tileSize + 10, 50);
+    } else {
+      for (let i = ZOOM_LEVELS.length - 1; i >= 0; i--) { if (ZOOM_LEVELS[i] < newTileSize) { newTileSize = ZOOM_LEVELS[i]; break; } }
+      if (newTileSize === tileSize) newTileSize = Math.max(tileSize - 10, 3);
+    }
+    if (newTileSize === tileSize) return;
+    // Keep point under cursor stable
+    const oldCX = mx - panX, oldCY = my - panY;
+    const scaleRatio = newTileSize / oldScale;
+    panX = mx - oldCX * scaleRatio;
+    panY = my - oldCY * scaleRatio;
+    tileSize = newTileSize;
+    document.getElementById('zoomLabel').textContent = tileSize + 'px';
+    render();
+  } else {
+    // Normal scroll → zoom in/out
+    if (e.deltaY < 0) zoomIn(); else zoomOut();
+  }
+}, { passive: false });
+
+// Touch pinch → zoom
+let _pinchStart = null;
+previewWrap.addEventListener('touchstart', function(e) {
+  if (e.touches.length === 2 && patternGrid) {
+    _pinchStart = { dist: _getTouchDist(e.touches), tileSize: tileSize };
+    _panStart = null;
+  }
+}, { passive: false });
+
+previewWrap.addEventListener('touchmove', function(e) {
+  if (_pinchStart && e.touches.length === 2) {
+    const dist = _getTouchDist(e.touches);
+    const ratio = dist / _pinchStart.dist;
+    const newTileSize = Math.max(3, Math.min(50, Math.round(_pinchStart.tileSize * ratio)));
+    if (newTileSize !== tileSize) {
+      tileSize = newTileSize;
+      document.getElementById('zoomLabel').textContent = tileSize + 'px';
+      render();
+    }
+    e.preventDefault();
+  }
+}, { passive: false });
+
+previewWrap.addEventListener('touchend', function() {
+  _pinchStart = null;
+});
 
 // ==================== Controls ====================
 function onBeadH(v) {
@@ -664,6 +1156,7 @@ function zoomIn() {
   let cur = tileSize;
   for (let z of ZOOM_LEVELS) { if (z>cur) { tileSize=z; break; } }
   if (tileSize===cur) tileSize = Math.min(cur+10, 50);
+  panX = 0; panY = 0;
   document.getElementById('zoomLabel').textContent = tileSize + 'px';
   render();
 }
@@ -671,11 +1164,13 @@ function zoomOut() {
   let cur = tileSize;
   for (let i=ZOOM_LEVELS.length-1; i>=0; i--) { if (ZOOM_LEVELS[i]<cur) { tileSize=ZOOM_LEVELS[i]; break; } }
   if (tileSize===cur) tileSize = Math.max(cur-10, 3);
+  panX = 0; panY = 0;
   document.getElementById('zoomLabel').textContent = tileSize + 'px';
   render();
 }
 function zoomReset() {
   tileSize = 20;
+  panX = 0; panY = 0;
   document.getElementById('zoomLabel').textContent = '20px';
   render();
 }
