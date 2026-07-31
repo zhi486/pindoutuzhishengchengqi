@@ -42,10 +42,22 @@ body {
 .panel-right::-webkit-scrollbar-thumb { background: #d6cfbf; border-radius: 3px; }
 .panel-right::-webkit-scrollbar-track { background: transparent; }
 
+/* ===== Upload Bar ===== */
+.upload-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 13px; padding: 10px 14px;
+  box-shadow: 0 1px 2px rgba(35,29,23,.035);
+}
+.upload-btn { flex: 1; text-align: center; }
+.upload-drop-hint {
+  font-size: 11.5px; color: var(--sub); white-space: nowrap;
+}
+
 /* ===== Upload ===== */
 .upload-zone { border: 1.5px dashed var(--border-strong); border-radius: 13px; text-align: center; padding: 15px 20px 14px; cursor: pointer; background: var(--card); transition: border-color .2s, background .2s, box-shadow .2s; }
 .upload-zone:hover { border-color: var(--accent); background: #fffaf4; }
-.upload-zone.dragover { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 4px rgba(224,90,43,.12); }
+.upload-bar.dragover { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 4px rgba(224,90,43,.12); }
 .upload-icon { width: 38px; height: 38px; margin: 0 auto 7px; border-radius: 11px; background: var(--accent-soft); display: grid; place-content: center; font-size: 17px; transition: transform .2s; }
 .upload-zone:hover .upload-icon { transform: translateY(-2px); }
 .upload-text { font-size: 13.5px; color: #4a443c; }
@@ -237,20 +249,17 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
         <p>图片转拼豆图纸 · 自动匹配色号清单</p>
       </div>
     </div>
-    <span class="header-tag" id="versionTag" title="版本标识">WEB · v250801a</span>
+    <span class="header-tag" id="versionTag" title="版本标识">WEB · v250801b</span>
   </div>
 </header>
 <div class="layout">
   <!-- Left: Upload + Preview -->
   <div class="panel-left">
     <input type="file" id="fileInput" accept="image/*" style="display:none">
-    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-      <div class="upload-icon">🖼️</div>
-      <div class="upload-text"><strong>点击选择图片</strong>，或直接拖放到此处</div>
-      <div class="upload-hint">支持 JPG / PNG / WebP · 图片仅在本地处理</div>
-      <div class="upload-actions" id="uploadActions" style="display:none;margin-top:10px">
-        <button class="btn btn-accent" onclick="event.stopPropagation();startCrop()" style="font-size:12px;padding:6px 14px">✂ 裁剪图片</button>
-      </div>
+    <div class="upload-bar" id="uploadBar">
+      <button class="btn btn-accent upload-btn" onclick="document.getElementById('fileInput').click()">📷 选择图片</button>
+      <button class="btn btn-dark upload-btn" onclick="startCrop()">✂ 裁剪图片</button>
+      <span class="upload-drop-hint">或拖放图片到此处</span>
     </div>
     <div class="preview-wrap" id="previewWrap">
       <canvas id="preview"></canvas>
@@ -299,12 +308,12 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
     <div class="card">
       <div class="card-title">图纸参数</div>
       <div class="control-row">
-        <label>豆子长度</label>
-        <input type="range" id="beadH" min="5" max="200" value="52" oninput="onBeadH(this.value)">
-        <input type="number" class="num" id="beadHNum" min="5" max="200" value="52" onchange="onBeadH(this.value)">
-        <span>行</span>
+        <label>豆子宽度</label>
+        <input type="range" id="beadW" min="5" max="200" value="52" oninput="onBeadW(this.value)">
+        <input type="number" class="num" id="beadWNum" min="5" max="200" value="52" onchange="onBeadW(this.value)">
+        <span>列</span>
       </div>
-      <div class="field-hint" id="beadWInfo">宽度：— 列</div>
+      <div class="field-hint" id="beadHInfo">高度：— 行</div>
       <div class="control-row">
         <label>最大颜色</label>
         <input type="range" id="maxColors" min="4" max="150" value="50" oninput="onMaxColors(this.value)">
@@ -561,8 +570,6 @@ function _loadImage(file) {
     imgOriginal = img;
     cropRect = null;
     panX = 0; panY = 0;
-    // 显示裁剪按钮
-    document.getElementById('uploadActions').style.display = '';
     document.getElementById('recropBtn').style.display = '';
     process();
   };
@@ -575,10 +582,12 @@ document.getElementById('fileInput').addEventListener('change', e => {
   _loadImage(f);
 });
 
-const uploadZone = document.getElementById('uploadZone');
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); });
-uploadZone.addEventListener('drop', e => {
+const uploadBar = document.getElementById('uploadBar');
+uploadBar.addEventListener('dragover', e => { e.preventDefault(); uploadBar.classList.add('dragover'); });
+uploadBar.addEventListener('dragleave', () => uploadBar.classList.remove('dragover'));
+uploadBar.addEventListener('drop', e => {
   e.preventDefault();
+  uploadBar.classList.remove('dragover');
   let f = e.dataTransfer.files[0];
   if (f && f.type.startsWith('image/')) {
     _loadImage(f);
@@ -589,7 +598,7 @@ uploadZone.addEventListener('drop', e => {
 function process() {
   if (!imgOriginal) return;
   let maxColors = parseInt(document.getElementById('maxColors').value);
-  beadH = parseInt(document.getElementById('beadH').value);
+  let beadW = parseInt(document.getElementById('beadW').value);
 
   // Determine source region (support crop)
   let srcX, srcY, srcW, srcH;
@@ -601,8 +610,8 @@ function process() {
     srcW = imgOriginal.width; srcH = imgOriginal.height;
   }
 
-  let beadW = Math.max(1, Math.round(srcW / srcH * beadH));
-  document.getElementById('beadWInfo').textContent = `宽度: ${beadW} 列`;
+  beadH = Math.max(1, Math.round(srcH / srcW * beadW));
+  document.getElementById('beadHInfo').textContent = `高度: ${beadH} 行`;
 
   let canvas = document.createElement('canvas');
   canvas.width = beadW; canvas.height = beadH;
@@ -1140,10 +1149,10 @@ previewWrap.addEventListener('touchend', function() {
 });
 
 // ==================== Controls ====================
-function onBeadH(v) {
+function onBeadW(v) {
   v = parseInt(v);
-  document.getElementById('beadH').value = v;
-  document.getElementById('beadHNum').value = v;
+  document.getElementById('beadW').value = v;
+  document.getElementById('beadWNum').value = v;
   process();
 }
 function onMaxColors(v) {
@@ -1511,11 +1520,6 @@ function exportPDF() {
 }
 
 // ==================== UI 增强（纯表现层，不影响核心逻辑） ====================
-// 拖放时高亮上传区
-uploadZone.addEventListener('dragenter', () => uploadZone.classList.add('dragover'));
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
-uploadZone.addEventListener('drop', () => uploadZone.classList.remove('dragover'));
-
 // 滑块轨道填充（把当前值百分比写入 --fill，CSS 据此渲染已滑过段的颜色）
 function paintRange(el) {
   el.style.setProperty('--fill', ((el.value - el.min) / (el.max - el.min) * 100) + '%');
@@ -1526,8 +1530,8 @@ document.querySelectorAll('input[type=range]').forEach(el => {
 });
 
 // 包装参数回调：数字框改动时同步滑块填充；首次生成后隐藏预览占位
-const _onBeadH = onBeadH, _onMaxColors = onMaxColors, _process = process;
-onBeadH = v => { _onBeadH(v); paintRange(document.getElementById('beadH')); };
+const _onBeadW = onBeadW, _onMaxColors = onMaxColors, _process = process;
+onBeadW = v => { _onBeadW(v); paintRange(document.getElementById('beadW')); };
 onMaxColors = v => { _onMaxColors(v); paintRange(document.getElementById('maxColors')); };
 process = function () {
   _process();
