@@ -237,7 +237,7 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
         <p>图片转拼豆图纸 · 自动匹配色号清单</p>
       </div>
     </div>
-    <span class="header-tag">WEB 版</span>
+    <span class="header-tag" id="versionTag" title="版本标识">WEB · v250801a</span>
   </div>
 </header>
 <div class="layout">
@@ -248,6 +248,9 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
       <div class="upload-icon">🖼️</div>
       <div class="upload-text"><strong>点击选择图片</strong>，或直接拖放到此处</div>
       <div class="upload-hint">支持 JPG / PNG / WebP · 图片仅在本地处理</div>
+      <div class="upload-actions" id="uploadActions" style="display:none;margin-top:10px">
+        <button class="btn btn-accent" onclick="event.stopPropagation();startCrop()" style="font-size:12px;padding:6px 14px">✂ 裁剪图片</button>
+      </div>
     </div>
     <div class="preview-wrap" id="previewWrap">
       <canvas id="preview"></canvas>
@@ -558,7 +561,10 @@ function _loadImage(file) {
     imgOriginal = img;
     cropRect = null;
     panX = 0; panY = 0;
-    startCrop();
+    // 显示裁剪按钮
+    document.getElementById('uploadActions').style.display = '';
+    document.getElementById('recropBtn').style.display = '';
+    process();
   };
   img.src = URL.createObjectURL(file);
 }
@@ -910,19 +916,15 @@ function confirmCrop() {
   };
 
   document.getElementById('cropOverlay').classList.remove('active');
-  document.getElementById('recropBtn').style.display = '';
   cropState = null;
   panX = 0; panY = 0;
   process();
 }
 
 function skipCrop() {
-  cropRect = null;
+  // 不改变 cropRect，直接关闭
   document.getElementById('cropOverlay').classList.remove('active');
-  document.getElementById('recropBtn').style.display = '';
   cropState = null;
-  panX = 0; panY = 0;
-  process();
 }
 
 document.getElementById('cropSkipBtn').addEventListener('click', skipCrop);
