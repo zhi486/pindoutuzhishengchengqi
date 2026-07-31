@@ -249,7 +249,7 @@ input[type=range]:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--acc
         <p>图片转拼豆图纸 · 自动匹配色号清单</p>
       </div>
     </div>
-    <span class="header-tag" id="versionTag" title="版本标识">WEB · v250801b</span>
+    <span class="header-tag" id="versionTag" title="版本标识">WEB · v250801c</span>
   </div>
 </header>
 <div class="layout">
@@ -560,6 +560,7 @@ let imgOriginal = null, patternGrid = null, patternIdx = null;
 let tileSize = 20, beadH = 52;
 let cropRect = null;  // { sx, sy, sw, sh } in original image coords, null = full image
 let panX = 0, panY = 0;  // preview canvas drag offset
+let _pendingCrop = false;  // 标记：选图后直接进裁剪窗口
 
 const ZOOM_LEVELS = [5,8,10,12,15,18,20,25,30,40,50];
 
@@ -571,7 +572,12 @@ function _loadImage(file) {
     cropRect = null;
     panX = 0; panY = 0;
     document.getElementById('recropBtn').style.display = '';
-    process();
+    if (_pendingCrop) {
+      _pendingCrop = false;
+      startCrop();
+    } else {
+      process();
+    }
   };
   img.src = URL.createObjectURL(file);
 }
@@ -669,7 +675,11 @@ function process() {
 let cropState = null;  // see startCrop() for shape
 
 function startCrop() {
-  if (!imgOriginal) return;
+  if (!imgOriginal) {
+    _pendingCrop = true;
+    document.getElementById('fileInput').click();
+    return;
+  }
   const maxW = Math.min(window.innerWidth * 0.88, 1200);
   const maxH = window.innerHeight * 0.62;
   const aspect = imgOriginal.width / imgOriginal.height;
